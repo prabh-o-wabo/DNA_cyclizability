@@ -41,7 +41,7 @@ assert(sequences % size == 0), f'sequences ({sequences}) % size ({size}) = {sequ
 SeqPerProcessor = sequences // size
 
 # generate the data in each process
-localSeq, localC0 = ce.GenerateSyntheticData(model, SeqPerProcessor)
+localSeq, localC0 = ce.GenerateSyntheticData(model, SeqPerProcessor, bpDistribution = [0.25, 0.25, 0.25, 0.25]) # bpDistribution is [A, T, C, G]
 
 # ensure the arrays are the right type (idk chatgpt did this to fix some error)
 local_seq = np.array(localSeq)

@@ -6,6 +6,7 @@ Functions to train the Convolutional Neural Network and Generate Sequences
 from .encoding import *
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf 
 import os
 from sklearn.model_selection import train_test_split
@@ -142,7 +143,7 @@ def TrainModel(dataFilepath, sep):
     c0Predict = c0predictionModel.predict(onehotArray)
     print(f'R for the prediction model: {np.corrcoef(c0Array.T, c0Predict.T)}')
 
-    return c0predictionModel, (c0Predict, c0Test)
+    return c0predictionModel, (c0Predict, c0Array)
 
 def GenerateSyntheticSeqs(numSequences):
 
@@ -157,7 +158,7 @@ def GenerateSyntheticSeqs(numSequences):
     
     return onehotArray
 
-def GenerateSyntheticData(model, numSequences, enforceSymmetry=False):
+def GenerateSyntheticData(model, numSequences, bpDistribution = [0.25, 0.25, 0.25, 0.25]):
     '''
     Function to generate sequences
 
@@ -171,7 +172,7 @@ def GenerateSyntheticData(model, numSequences, enforceSymmetry=False):
 
     Returns
     -------
-    seqArray : numpy array
+    onehotArray : numpy array
         A 2D Numpy array containing onehot encoded sequences
 
     c0Array : numpy array
@@ -179,32 +180,32 @@ def GenerateSyntheticData(model, numSequences, enforceSymmetry=False):
     '''
     seqLength = 50
 
+    bp = np.asarray(bpDistribution, dtype=np.float32)
+    if bp.size != 4:
+        raise ValueError("bpDistribution must have length 4")
+    if not np.isclose(bp.sum(), 1.0):
+        raise ValueError("bpDistribution must sum to 1 (no normalization performed)")
+    if (bp < 0).any():
+        raise ValueError("bpDistribution must not contain negative values")
+
+
     # 4x4 identity matrix
-    mapping = np.eye(4)
+    mapping = np.eye(4, dtype = np.int8)
 
     # generating random sequences
-    seqArray= np.random.randint(0, 4, size = (numSequences, seqLength))
-    seqArray = mapping[seqArray]
-
-    seqArray = seqArray.reshape(-1, seqLength * 4).astype(np.int8)
-
-    seqArrayRC = Data2Onehot(SeqArr2RevCompArr(Onehot2Data(seqArray))).reshape(seqArray.shape[0], 200, 1)
-
-    seqArray = seqArray.reshape(-1, seqLength * 4, 1)
-
+    onehotArray = np.random.choice(4, size = (numSequences, seqLength), p = bp)
+    onehotArray = mapping[onehotArray]
+    onehotArray = onehotArray.reshape(numSequences, seqLength * 4, 1).astype(np.float32)
 
     # predict cyclizabilities associated with the sequences
 
-    if enforceSymmetry:
-        c0Array = model.predict([seqArray, seqArrayRC], batch_size = 256)
-    else:
-        c0Array = model.predict(seqArray, batch_size = 256)
+    c0Array = model.predict(onehotArray, batch_size = 256)
 
     # reshape back to usable shape
-    seqArray = seqArray.reshape(numSequences, 200).astype(np.int8)
+    onehotArray = onehotArray.reshape(numSequences, 200)
     c0Array = c0Array.reshape(len(c0Array))
 
-    return seqArray, c0Array
+    return onehotArray, c0Array
 
 def YonghansArchitecture():
     '''
